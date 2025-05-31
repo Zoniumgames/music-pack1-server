@@ -1,10 +1,9 @@
 <!DOCTYPE html>
-<html lang="es">
+<html>
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GAMMA - Music Player</title>
-<link rel="icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQdrUvdIpGEbmwRwIPt8fUIjpB8kYXTywJiJZI0D1iZfQ&s">
 <!-- Preconnect para Google Fonts para mejor rendimiento -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,11 +16,6 @@
 
 <style>
   /* --- Variables CSS para una Paleta de Colores y Espaciado Escalable --- */
-
-html, body {
-  height: 100%;
-}
-
   :root {
     --color-bg-primary: hsl(220, 10%, 10%);   /* Fondo principal oscuro */
     --color-bg-secondary: hsl(220, 9%, 15%);  /* Fondo para header/footer */
@@ -54,6 +48,10 @@ html, body {
   }
 
   /* --- Estilos Base y Tipografía --- */
+  html, body {
+  height: 100%;
+}
+
   * {
     box-sizing: border-box;
     margin: 0;
@@ -534,6 +532,23 @@ html, body {
       font-size: 0.75rem;
     }
   }
+  
+  .vinyl-disc {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background-image: url('5856b3da4f6ae202fedf2794.png');
+  background-size: cover;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  animation: spin 4s linear infinite;
+  animation-play-state: paused;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 </style>
 </head>
 <body>
@@ -541,12 +556,7 @@ html, body {
 <header>
   <h1>GAMMA</h1>
   <nav>
-    <button onclick="window.open('https://zoniumgames.github.io/music-pack1-server/', '_blank')">Pack 1</button>
-    <button onclick="window.open('https://zoniumgames.github.io/music-pack2-server/', '_blank')">Pack 2</button>
-    <button onclick="window.open('https://zoniumgames.github.io/music-pack3-server/', '_blank')">Pack 3</button>
-    <button onclick="window.open('https://zoniumgames.github.io/music-pack4-server/', '_blank')">Pack 4</button>
-    <button onclick="window.open('https://zoniumgames.github.io/music-pack5-server/', '_blank')">Pack 5</button>
-    <button onclick="window.open('https://zoniumgames.github.io/music-pack6-server/', '_blank')">Pack 6</button>
+
   </nav>
 </header>
 
@@ -561,7 +571,7 @@ html, body {
 <footer>
   <div class="player-section current-song-info">
     <!-- Portada genérica ya que no se extrae de metadatos -->
-    <img id="album-art" src="https://via.placeholder.com/60/1E232B/A6A8AA?text=MUSIC" alt="Album Art">
+    <div id="album-art" class="vinyl-disc"></div>
     <div class="current-song-details">
       <div class="title" id="song-title">Cargando...</div>
       <div class="artist" id="song-artist">Zonium Games</div> <!-- Artista genérico fijo -->
@@ -591,17 +601,22 @@ html, body {
 </footer>
 
 <script>
-  const user = 'Zoniumgames';
-  const repo = 'music-pack1-server';
+  const user = 'zoniumgames'; // Tu usuario de GitHub
+  const repos = [
+    'music-pack1-server',
+    'music-pack2-server',
+    'music-pack3-server',
+    'music-pack4-server',
+    'music-pack5-server',
+    'music-pack6-server'
+  ];
   const branch = 'main';
 
   const playlistEl = document.getElementById('playlist');
   const audioEl = document.getElementById('audio');
-
-  // Elementos del reproductor
   const albumArtEl = document.getElementById('album-art');
   const songTitleEl = document.getElementById('song-title');
-  const songArtistEl = document.getElementById('song-artist'); // Se mantendrá fijo
+  const songArtistEl = document.getElementById('song-artist');
   const prevBtn = document.getElementById('prev-btn');
   const playPauseBtn = document.getElementById('play-pause-btn');
   const nextBtn = document.getElementById('next-btn');
@@ -609,178 +624,137 @@ html, body {
   const volumeSlider = document.getElementById('volume-slider');
   const currentTimeEl = document.getElementById('current-time');
   const totalTimeEl = document.getElementById('total-time');
-  const searchInput = document.getElementById('search-input'); // Nuevo: Barra de búsqueda
+  const searchInput = document.getElementById('search-input');
 
+  const defaultAlbumArt = 'https://via.placeholder.com/60/1E232B/A6A8AA?text=MUSIC';
+  const defaultArtist = 'Zonium Games';
+
+  let songs = [];
   let currentIndex = -1;
-  let songs = []; // Almacenará objetos { name, url, title, artist, albumArt }
 
-  // Valores por defecto (fijos)
-  const defaultAlbumArt = 'https://via.placeholder.com/60/1E232B/A6A8AA?text=MUSIC'; // Placeholder de portada
-  const defaultArtist = 'Zonium Games'; // Artista fijo
-
-  // Función para formatear el tiempo (segundos a MM:SS)
   function formatTime(seconds) {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   }
 
-  // Obtener lista de archivos mp3 desde GitHub API (raíz del repo)
-  async function fetchSongs() {
-    try {
-      const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/?ref=${branch}`);
-      const data = await res.json();
+  async function fetchSongsFromAllRepos() {
+    songs = [];
+    playlistEl.innerHTML = '<li>Cargando canciones...</li>';
 
-      if (!Array.isArray(data)) throw new Error('Error obteniendo archivos del repositorio.');
+    for (const repo of repos) {
+      try {
+        const res = await fetch(`https://api.github.com/repos/${user}/${repo}/contents/?ref=${branch}`);
+        const data = await res.json();
 
-      // Filtrar sólo mp3 y construir el array de canciones
-      songs = data
-        .filter(item => item.type === 'file' && item.name.endsWith('.mp3'))
-        .map(item => {
-          const nameWithoutExt = item.name.replace('.mp3', '');
-          return {
-            name: item.name,
-            url: `https://${user}.github.io/${repo}/${item.name}`,
-            title: nameWithoutExt, // El título es el nombre del archivo sin extensión
-            artist: defaultArtist, // Artista fijo
-            albumArt: defaultAlbumArt // Portada fija
-          };
-        });
+        if (Array.isArray(data)) {
+          const mp3s = data
+            .filter(item => item.type === 'file' && item.name.endsWith('.mp3'))
+            .map(item => ({
+              title: item.name.replace('.mp3', ''),
+              artist: defaultArtist,
+              albumArt: defaultAlbumArt,
+              url: `https://${user}.github.io/${repo}/${item.name}`
+            }));
 
-      if (songs.length === 0) {
-        playlistEl.innerHTML = '<li>No se encontraron canciones (.mp3) en el repositorio.</li>';
-        return;
+          songs.push(...mp3s);
+        }
+      } catch (err) {
+        console.error(`Error cargando canciones del repo ${repo}:`, err);
       }
+    }
 
+    if (songs.length === 0) {
+      playlistEl.innerHTML = '<li>No se encontraron canciones en los repositorios.</li>';
+    } else {
       renderPlaylist();
-      playSong(0); // Inicia la reproducción de la primera canción automáticamente
-      updatePlayerDisplay(); // Inicializa la visualización del reproductor
-
-    } catch (error) {
-      playlistEl.innerHTML = '<li>Error cargando canciones. Por favor, verifica la consola para más detalles.</li>';
-      console.error('Error fetching songs:', error);
-      // Actualizar el reproductor con estado de error
-      songTitleEl.textContent = 'Error al cargar';
-      songArtistEl.textContent = 'Intenta de nuevo más tarde';
-      albumArtEl.src = defaultAlbumArt;
-      playPauseBtn.disabled = true;
-      prevBtn.disabled = true;
-      nextBtn.disabled = true;
-      seekSlider.disabled = true;
+      playSong(0);
     }
   }
 
-  // Renderizar lista de canciones
   function renderPlaylist() {
     playlistEl.innerHTML = '';
     songs.forEach((song, i) => {
       const li = document.createElement('li');
-      li.textContent = song.title; // Usar el título (nombre del archivo sin extensión)
-      li.dataset.index = i; // Guardar el índice para acceder rápidamente
+      li.textContent = song.title;
+      li.dataset.index = i;
       li.addEventListener('click', () => playSong(i));
       playlistEl.appendChild(li);
     });
   }
 
-  // Actualizar la clase 'playing' en la lista
   function updatePlayingClass() {
     document.querySelectorAll('#playlist li').forEach((li, i) => {
-      if (i === currentIndex) {
-        li.classList.add('playing');
-        // Scroll a la canción activa si es necesario
-        li.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      } else {
-        li.classList.remove('playing');
-      }
+      li.classList.toggle('playing', i === currentIndex);
     });
   }
 
-  // Cargar y reproducir una canción
   function playSong(index) {
-    if (index < 0 || index >= songs.length) return; // Validación de índice
+    if (index < 0 || index >= songs.length) return;
 
     currentIndex = index;
     const song = songs[currentIndex];
-
     audioEl.src = song.url;
     songTitleEl.textContent = song.title;
     songArtistEl.textContent = song.artist;
-    albumArtEl.src = song.albumArt; // Siempre usará el placeholder
-
+    albumArtEl.src = song.albumArt;
     audioEl.play();
-    playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>'; // Icono de pausa
+    playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
     updatePlayingClass();
+    document.getElementById('album-art').style.animationPlayState = 'running';
   }
 
-  // Pausar/Reanudar reproducción
   function togglePlayPause() {
-    if (audioEl.paused) {
-      audioEl.play();
-      playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
-    } else {
-      audioEl.pause();
-      playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
-    }
+  if (audioEl.paused) {
+    audioEl.play();
+    playPauseBtn.innerHTML = '<i class="fas fa-pause"></i>';
+    document.getElementById('album-art').style.animationPlayState = 'running';
+  } else {
+    audioEl.pause();
+    playPauseBtn.innerHTML = '<i class="fas fa-play"></i>';
+    document.getElementById('album-art').style.animationPlayState = 'paused';
   }
+}
 
-  // Navegar a la canción anterior
   function playPrev() {
     playSong((currentIndex - 1 + songs.length) % songs.length);
   }
 
-  // Navegar a la canción siguiente
   function playNext() {
     playSong((currentIndex + 1) % songs.length);
   }
 
-  // Actualizar el display del reproductor (duración, tiempo actual)
   function updatePlayerDisplay() {
     if (!isNaN(audioEl.duration)) {
       totalTimeEl.textContent = formatTime(audioEl.duration);
       seekSlider.max = audioEl.duration;
-    } else {
-      totalTimeEl.textContent = '0:00';
-      seekSlider.max = 0;
     }
     currentTimeEl.textContent = formatTime(audioEl.currentTime);
     seekSlider.value = audioEl.currentTime;
   }
 
-  // Event Listeners
   playPauseBtn.addEventListener('click', togglePlayPause);
   prevBtn.addEventListener('click', playPrev);
   nextBtn.addEventListener('click', playNext);
-
   audioEl.addEventListener('timeupdate', updatePlayerDisplay);
-  audioEl.addEventListener('ended', playNext); // Reproducir siguiente al terminar
-  audioEl.addEventListener('loadedmetadata', updatePlayerDisplay); // Actualizar al cargar metadatos
-
+  audioEl.addEventListener('ended', playNext);
+  audioEl.addEventListener('loadedmetadata', updatePlayerDisplay);
   seekSlider.addEventListener('input', () => {
     audioEl.currentTime = seekSlider.value;
   });
-
   volumeSlider.addEventListener('input', () => {
     audioEl.volume = volumeSlider.value / 100;
   });
 
-  // Filtro de búsqueda
   searchInput.addEventListener('input', (e) => {
     const searchTerm = e.target.value.toLowerCase();
-    const listItems = document.querySelectorAll('#playlist li');
-
-    listItems.forEach(item => {
-      const songTitle = item.textContent.toLowerCase();
-      if (songTitle.includes(searchTerm)) {
-        item.style.display = 'flex'; // Mostrar como flexbox
-      } else {
-        item.style.display = 'none';
-      }
+    document.querySelectorAll('#playlist li').forEach(item => {
+      item.style.display = item.textContent.toLowerCase().includes(searchTerm) ? 'flex' : 'none';
     });
   });
 
-
-  // Cargar canciones al iniciar
-  fetchSongs();
+  // 🚀 Iniciar carga de todos los repos al entrar
+  window.addEventListener('DOMContentLoaded', fetchSongsFromAllRepos);
 </script>
 </body>
 </html>
